@@ -1,13 +1,34 @@
-# CloudFlare Prometheus exporter
+# CloudFlare Prometheus exporter (Enhanced Fork)
 [<img src="ll-logo.png">](https://lablabs.io/)
 
+**🚀 This is an enhanced fork of the original cloudflare-exporter with additional cache monitoring capabilities.**
+
 We help companies build, run, deploy and scale software and infrastructure by embracing the right technologies and principles. Check out our website at https://lablabs.io/
+
+---
+
+## 🆕 New Features in This Fork
+
+This enhanced version includes the following additional functionality:
+
+### Cache Status Metrics by Host
+- **New Metric**: `cloudflare_zone_requests_cache_status_host`
+- **Purpose**: Provides detailed cache performance metrics per host and cache status
+- **Labels**: `zone`, `account`, `host`, `cache_status`
+- **Cache Statuses**: `hit`, `miss`, `dynamic`, `none`, `revalidated`, `expired`, etc.
+
+### Enhanced Monitoring Capabilities
+- Better visibility into cache performance across different hosts within your zones
+- Detailed breakdown of cache behavior for performance optimization
+- Support for identifying cache misses and dynamic content patterns
 
 ---
 
 ## Description
 Prometheus exporter exposing Cloudflare Analytics dashboard data on a per-zone basis, as well as Worker metrics.
 The exporter is also able to scrape Zone metrics by Colocations (https://www.cloudflare.com/network/).
+
+**Enhanced with cache status monitoring for better performance insights.**
 
 ## Grafana Dashboard
 ![Dashboard](https://i.ibb.co/HDsqDF1/cf-exporter.png)
@@ -48,7 +69,7 @@ The exporter can be configured using env variables or command flags.
 | `CF_API_TOKEN` |  API authentication token (recommended before API key + email. Version 0.0.5+. see https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth) |
 | `CF_ZONES` |  (Optional) cloudflare zones to export, comma delimited list of zone ids. If not set, all zones from account are exported |
 | `CF_EXCLUDE_ZONES` |  (Optional) cloudflare zones to exclude, comma delimited list of zone ids. If not set, no zones from account are excluded |
-| `FREE_TIER` | (Optional) scrape only metrics included in free plan. Accepts `true` or `false`, default `false`. |
+| `FREE_TIER` | (Optional) scrape only metrics included in free plan. Accepts `true` or `false`, default `false`. **Note: Cache status metrics require non-free plans** |
 | `LISTEN` |  listen on addr:port (default `:8080`), omit addr to listen on all interfaces |
 | `METRICS_PATH` |  path for metrics, default `/metrics` |
 | `SCRAPE_DELAY` | scrape delay in seconds, default `300` |
@@ -74,6 +95,13 @@ Corresponding flags:
 Note: `ZONE_<name>` configuration is not supported as flag.
 
 ## List of available metrics
+
+### 🆕 Enhanced Cache Metrics
+```
+# HELP cloudflare_zone_requests_cache_status_host Number of requests for zone per host per cache status (hit, miss, dynamic, none, revalidated, etc)
+```
+
+### Original Metrics
 ```
 # HELP cloudflare_worker_cpu_time CPU time quantiles by script name
 # HELP cloudflare_worker_duration Duration quantiles by script name (GB*s)
@@ -104,6 +132,29 @@ Note: `ZONE_<name>` configuration is not supported as flag.
 # HELP cloudflare_zone_pool_requests_total Requests per pool
 # HELP cloudflare_logpush_failed_jobs_account_count Number of failed logpush jobs on the account level
 # HELP cloudflare_logpush_failed_jobs_zone_count Number of failed logpush jobs on the zone level
+```
+
+## 📊 Example Prometheus Queries for New Metrics
+
+### Cache Hit Ratio by Host
+```promql
+sum(rate(cloudflare_zone_requests_cache_status_host{cache_status=~"hit|revalidated"}[5m])) by (host) / 
+sum(rate(cloudflare_zone_requests_cache_status_host[5m])) by (host)
+```
+
+### Top Hosts with Cache Misses
+```promql
+topk(10, sum(rate(cloudflare_zone_requests_cache_status_host{cache_status="miss"}[5m])) by (host))
+```
+
+### Dynamic Content (Non-cacheable) by Host
+```promql
+sum(rate(cloudflare_zone_requests_cache_status_host{cache_status="dynamic"}[5m])) by (host)
+```
+
+### Cache Status Distribution
+```promql
+sum(rate(cloudflare_zone_requests_cache_status_host[5m])) by (cache_status)
 ```
 
 ## Helm chart repository
@@ -138,7 +189,7 @@ Configure zones and listening port:
 docker run --rm -p 8080:8081 -e CF_API_TOKEN=${CF_API_TOKEN} -e CF_ZONES=zoneid1,zoneid2,zoneid3 -e LISTEN=:8081 ghcr.io/lablabs/cloudflare_exporter
 ```
 
-Disable non-free metrics:
+Disable non-free metrics (including new cache status metrics):
 ```
 docker run --rm -p 8080:8080 -e CF_API_TOKEN=${CF_API_TOKEN} -e FREE_TIER=true ghcr.io/lablabs/cloudflare_exporter
 ```
@@ -147,6 +198,10 @@ Access help:
 ```
 docker run --rm -p 8080:8080 -i ghcr.io/lablabs/cloudflare_exporter --help
 ```
+
+## 🔗 Original Repository
+
+This fork is based on the original cloudflare-exporter from [lablabs/cloudflare-exporter](https://github.com/lablabs/cloudflare-exporter).
 
 ## Contributing and reporting issues
 Feel free to create an issue in this repository if you have questions, suggestions or feature requests.

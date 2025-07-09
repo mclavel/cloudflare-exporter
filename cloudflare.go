@@ -194,6 +194,14 @@ type zoneResp struct {
 		} `json:"dimensions"`
 	} `json:"httpRequestsEdgeCountryHost"`
 
+	HTTPRequestsCacheStatusByHost []struct {
+		Count      uint64 `json:"count"`
+		Dimensions struct {
+			ClientRequestHTTPHost string `json:"clientRequestHTTPHost"`
+			CacheStatus           string `json:"cacheStatus"`
+		} `json:"dimensions"`
+	} `json:"httpRequestsCacheStatusByHost"`
+
 	HealthCheckEventsAdaptiveGroups []struct {
 		Count      uint64 `json:"count"`
 		Dimensions struct {
@@ -425,6 +433,13 @@ query ($zoneIDs: [String!], $mintime: Time!, $maxtime: Time!, $limit: Int!) {
 					clientCountryName
 					clientRequestHTTPHost
 				}
+			}
+			httpRequestsCacheStatusByHost: httpRequestsAdaptiveGroups(limit: $limit, filter: { datetime_geq: $mintime, datetime_lt: $maxtime }) {
+					count
+					dimensions {
+							clientRequestHTTPHost
+							cacheStatus
+					}
 			}
 			healthCheckEventsAdaptiveGroups(limit: $limit, filter: { datetime_geq: $mintime, datetime_lt: $maxtime }) {
 				count
@@ -780,7 +795,7 @@ func extractZoneIDs(zones []cloudflare.Zone) []string {
 
 func filterNonFreePlanZones(zones []cloudflare.Zone) (filteredZones []cloudflare.Zone) {
 	for _, z := range zones {
-		if z.Plan.ZonePlanCommon.ID != "0feeeeeeeeeeeeeeeeeeeeeeeeeeeeee" {
+		if z.Plan.ID != "0feeeeeeeeeeeeeeeeeeeeeeeeeeeeee" {
 			filteredZones = append(filteredZones, z)
 		}
 	}

@@ -28,6 +28,7 @@ const (
 	zoneRequestBrowserMapMetricName              MetricName = "cloudflare_zone_requests_browser_map_page_views_count"
 	zoneRequestOriginStatusCountryHostMetricName MetricName = "cloudflare_zone_requests_origin_status_country_host"
 	zoneRequestStatusCountryHostMetricName       MetricName = "cloudflare_zone_requests_status_country_host"
+	zoneRequestCacheStatusHostMetricName         MetricName = "cloudflare_zone_requests_cache_status_host"
 	zoneBandwidthTotalMetricName                 MetricName = "cloudflare_zone_bandwidth_total"
 	zoneBandwidthCachedMetricName                MetricName = "cloudflare_zone_bandwidth_cached"
 	zoneBandwidthSSLEncryptedMetricName          MetricName = "cloudflare_zone_bandwidth_ssl_encrypted"
@@ -118,6 +119,12 @@ var (
 		Name: zoneRequestStatusCountryHostMetricName.String(),
 		Help: "Count of requests for zone per edge HTTP status per country per host",
 	}, []string{"zone", "account", "status", "country", "host"},
+	)
+
+	zoneRequestCacheStatusHost = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: zoneRequestCacheStatusHostMetricName.String(),
+		Help: "Number of requests for zone per host per cache status (hit, miss, dynamic, none, revalidated, etc)",
+	}, []string{"zone", "account", "host", "cache_status"},
 	)
 
 	zoneBandwidthTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -275,6 +282,7 @@ func buildAllMetricsSet() MetricsSet {
 	allMetricsSet.Add(zoneRequestBrowserMapMetricName)
 	allMetricsSet.Add(zoneRequestOriginStatusCountryHostMetricName)
 	allMetricsSet.Add(zoneRequestStatusCountryHostMetricName)
+	allMetricsSet.Add(zoneRequestCacheStatusHostMetricName)
 	allMetricsSet.Add(zoneBandwidthTotalMetricName)
 	allMetricsSet.Add(zoneBandwidthCachedMetricName)
 	allMetricsSet.Add(zoneBandwidthSSLEncryptedMetricName)
@@ -340,6 +348,9 @@ func mustRegisterMetrics(deniedMetrics MetricsSet) {
 	}
 	if !deniedMetrics.Has(zoneRequestStatusCountryHostMetricName) {
 		prometheus.MustRegister(zoneRequestStatusCountryHost)
+	}
+	if !deniedMetrics.Has(zoneRequestCacheStatusHostMetricName) {
+		prometheus.MustRegister(zoneRequestCacheStatusHost)
 	}
 	if !deniedMetrics.Has(zoneBandwidthTotalMetricName) {
 		prometheus.MustRegister(zoneBandwidthTotal)
@@ -548,6 +559,7 @@ func fetchZoneAnalytics(zones []cloudflare.Zone, wg *sync.WaitGroup) {
 		addFirewallGroups(&z, name, account)
 		addHealthCheckGroups(&z, name, account)
 		addHTTPAdaptiveGroups(&z, name, account)
+		addCacheStatusGroups(&z, name, account)
 	}
 }
 
@@ -722,5 +734,17 @@ func addLoadBalancingRequestsAdaptive(z *lbResp, name string, account string) {
 					"pool_name":          p.PoolName,
 				}).Set(float64(p.Healthy))
 		}
+	}
+}
+
+func addCacheStatusGroups(z *zoneResp, name string, account string) {
+	for _, g := range z.HTTPRequestsCacheStatusByHost {
+		zoneRequestCacheStatusHost.With(
+			prometheus.Labels{
+				"zone":         name,
+				"account":      account,
+				"host":         g.Dimensions.ClientRequestHTTPHost,
+				"cache_status": g.Dimensions.CacheStatus,
+			}).Add(float64(g.Count))
 	}
 }

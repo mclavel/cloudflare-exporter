@@ -133,28 +133,23 @@ func fetchMetrics() {
 	wg.Wait()
 }
 
-func runExpoter() {
-	// fmt.Println(" :", viper.GetString("cf_api_email"))
-	// fmt.Println(" :", viper.GetString("cf_api_key"))
-
-	// fmt.Println(" :", viper.GetString("metrics_path"))
-
-	// fmt.Println(":ASD :", viper.GetString("listen"))
-
-	// fmt.Println(" :", cfgListen)
-
+func runExporter() {
 	cfgMetricsPath := viper.GetString("metrics_path")
 
-	if !(len(viper.GetString("cf_api_token")) > 0 || (len(viper.GetString("cf_api_email")) > 0 && len(viper.GetString("cf_api_key")) > 0)) {
+	// Aplicar la ley de De Morgan
+	// Cambiar de: !(A || B) a: !A && !B
+	if len(viper.GetString("cf_api_token")) == 0 && (len(viper.GetString("cf_api_email")) == 0 || len(viper.GetString("cf_api_key")) == 0) {
 		log.Fatal("Please provide CF_API_KEY+CF_API_EMAIL or CF_API_TOKEN")
 	}
+
 	if viper.GetInt("cf_batch_size") < 1 || viper.GetInt("cf_batch_size") > 10 {
 		log.Fatal("CF_BATCH_SIZE must be between 1 and 10")
 	}
+
 	customFormatter := new(log.TextFormatter)
 	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
-	log.SetFormatter(customFormatter)
 	customFormatter.FullTimestamp = true
+	log.SetFormatter(customFormatter)
 
 	metricsDenylist := []string{}
 	if len(viper.GetString("metrics_denylist")) > 0 {
@@ -197,7 +192,7 @@ func main() {
 		Use:   "viper-test",
 		Short: "testing viper",
 		Run: func(_ *cobra.Command, _ []string) {
-			runExpoter()
+			runExporter()
 		},
 	}
 
